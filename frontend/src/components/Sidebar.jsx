@@ -8,7 +8,8 @@ export default function Sidebar({
   playlists = [],
   favoritesCount = 0,
   tracksCount = 0,
-  onOpenCreatePlaylist
+  onOpenCreatePlaylist,
+  onDeletePlaylist
 }) {
   return (
     <aside className="sidebar">
@@ -18,11 +19,12 @@ export default function Sidebar({
           setActiveView('library')
           setActivePlaylistId(null)
         }}
+        title="SPVM3 Player Home"
       >
         <div className="brand-icon">🎧</div>
         <div>
           <div className="brand-title">SPVM3 Player</div>
-          <div className="brand-tag">Hi-Fi Audio</div>
+          <div className="brand-tag">Hi-Fi Studio</div>
         </div>
       </div>
 
@@ -66,33 +68,55 @@ export default function Sidebar({
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '6px' }}>
-          {playlists.map((pl) => (
-            <button
-              key={pl.id}
-              className={`playlist-item ${activePlaylistId === pl.id ? 'active' : ''}`}
-              onClick={() => {
-                setActiveView('playlist')
-                setActivePlaylistId(pl.id)
-              }}
-              title={pl.description || pl.name}
-            >
-              <span className="icon">💿</span>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {pl.name}
-              </span>
-              <span style={{ marginLeft: 'auto', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                {pl.track_count ?? pl.track_ids?.length ?? 0}
-              </span>
-            </button>
-          ))}
+          {playlists.length === 0 ? (
+            <div style={{ padding: '8px 12px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+              No custom playlists
+            </div>
+          ) : (
+            playlists.map((pl) => (
+              <div
+                key={pl.id}
+                className={`playlist-item-wrapper ${activePlaylistId === pl.id ? 'active' : ''}`}
+              >
+                <button
+                  className={`playlist-item ${activePlaylistId === pl.id ? 'active' : ''}`}
+                  onClick={() => {
+                    setActiveView('playlist')
+                    setActivePlaylistId(pl.id)
+                  }}
+                  title={pl.description || pl.name}
+                >
+                  <span className="icon">💿</span>
+                  <span className="pl-name">
+                    {pl.name}
+                  </span>
+                  <span className="pl-count">
+                    {pl.track_count ?? pl.track_ids?.length ?? 0}
+                  </span>
+                </button>
+                {onDeletePlaylist && (
+                  <button
+                    className="delete-playlist-btn"
+                    title={`Delete playlist "${pl.name}"`}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onDeletePlaylist(pl.id)
+                    }}
+                  >
+                    🗑
+                  </button>
+                )}
+              </div>
+            ))
+          )}
         </div>
       </div>
 
-      <div style={{ padding: '12px', background: 'rgba(255,255,255,0.03)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)' }}>
-        <div style={{ fontSize: '0.75rem', fontWeight: '600', color: 'var(--accent-secondary)', marginBottom: '4px' }}>
-          ⚡ REAL AUDIO LINKED
+      <div className="sidebar-footer-card">
+        <div className="footer-card-title">
+          ⚡ REAL AUDIO STREAMING
         </div>
-        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
+        <div className="footer-card-body">
           Direct stream from <code>/songs</code> with HTTP 206 range seeking support.
         </div>
       </div>

@@ -32,13 +32,31 @@ export async function createPlaylist({ name, description = '' }) {
   return res.json()
 }
 
+export async function updatePlaylist(playlistId, data) {
+  const res = await fetch(`${API_BASE}/playlists/${playlistId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  })
+  if (!res.ok) throw new Error('Failed to update playlist')
+  return res.json()
+}
+
+export async function deletePlaylist(playlistId) {
+  const res = await fetch(`${API_BASE}/playlists/${playlistId}`, {
+    method: 'DELETE'
+  })
+  if (!res.ok) throw new Error('Failed to delete playlist')
+  return res.json()
+}
+
 export async function addTrackToPlaylist(playlistId, trackId) {
   const res = await fetch(`${API_BASE}/playlists/${playlistId}/tracks`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ track_id: trackId })
   })
-  if (!res.ok) throw new Error('Failed to add track')
+  if (!res.ok) throw new Error('Failed to add track to playlist')
   return res.json()
 }
 
@@ -46,7 +64,7 @@ export async function removeTrackFromPlaylist(playlistId, trackId) {
   const res = await fetch(`${API_BASE}/playlists/${playlistId}/tracks/${trackId}`, {
     method: 'DELETE'
   })
-  if (!res.ok) throw new Error('Failed to remove track')
+  if (!res.ok) throw new Error('Failed to remove track from playlist')
   return res.json()
 }
 

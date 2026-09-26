@@ -10,32 +10,38 @@ export default function Visualizer({ isPlaying }) {
     const ctx = canvas.getContext('2d')
 
     let phase = 0
-    const barCount = 48
+    const barCount = 64
 
     const render = () => {
-      canvas.width = canvas.offsetWidth * window.devicePixelRatio || 600
-      canvas.height = canvas.offsetHeight * window.devicePixelRatio || 80
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      const dpr = window.devicePixelRatio || 1
+      const rect = canvas.getBoundingClientRect()
+      
+      canvas.width = rect.width * dpr
+      canvas.height = rect.height * dpr
+      ctx.scale(dpr, dpr)
+      
+      ctx.clearRect(0, 0, rect.width, rect.height)
 
-      const w = canvas.width
-      const h = canvas.height
-      const barWidth = (w / barCount) * 0.7
-      const gap = (w / barCount) * 0.3
+      const w = rect.width
+      const h = rect.height
+      const barWidth = (w / barCount) * 0.65
+      const gap = (w / barCount) * 0.35
 
       const gradient = ctx.createLinearGradient(0, h, 0, 0)
       gradient.addColorStop(0, '#8b5cf6')
       gradient.addColorStop(0.5, '#06b6d4')
-      gradient.addColorStop(1, '#a855f7')
+      gradient.addColorStop(1, '#ec4899')
 
       ctx.fillStyle = gradient
 
       for (let i = 0; i < barCount; i++) {
         let barHeight
         if (isPlaying) {
-          const wave1 = Math.sin(phase * 0.08 + i * 0.25)
-          const wave2 = Math.cos(phase * 0.05 + i * 0.15)
-          const factor = Math.abs(wave1 * 0.6 + wave2 * 0.4)
-          barHeight = Math.max(6, factor * (h * 0.75))
+          const wave1 = Math.sin(phase * 0.07 + i * 0.2)
+          const wave2 = Math.cos(phase * 0.04 + i * 0.12)
+          const wave3 = Math.sin(phase * 0.09 + i * 0.3)
+          const factor = Math.abs(wave1 * 0.5 + wave2 * 0.3 + wave3 * 0.2)
+          barHeight = Math.max(6, factor * (h * 0.8))
         } else {
           barHeight = 4
         }
@@ -44,7 +50,11 @@ export default function Visualizer({ isPlaying }) {
         const y = h - barHeight
 
         ctx.beginPath()
-        ctx.roundRect(x, y, barWidth, barHeight, [4, 4, 0, 0])
+        if (ctx.roundRect) {
+          ctx.roundRect(x, y, barWidth, barHeight, [4, 4, 0, 0])
+        } else {
+          ctx.rect(x, y, barWidth, barHeight)
+        }
         ctx.fill()
       }
 
@@ -63,7 +73,12 @@ export default function Visualizer({ isPlaying }) {
 
   return (
     <div className="visualizer-card">
-      <div className="visualizer-label">Audio Frequency Waveform</div>
+      <div className="visualizer-header">
+        <span className="visualizer-label">⚡ Audio Frequency Spectrum</span>
+        <span className={`visualizer-badge ${isPlaying ? 'active' : ''}`}>
+          {isPlaying ? 'LIVE AUDIO PULSE' : 'PAUSED'}
+        </span>
+      </div>
       <canvas ref={canvasRef} className="visualizer-canvas" />
     </div>
   )

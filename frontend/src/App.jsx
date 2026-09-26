@@ -4,6 +4,9 @@ import {
   fetchGenres,
   fetchPlaylists,
   createPlaylist,
+  deletePlaylist,
+  addTrackToPlaylist,
+  removeTrackFromPlaylist,
   toggleFavorite
 } from './api'
 import Sidebar from './components/Sidebar'
@@ -24,20 +27,30 @@ export default function App() {
   const [activeGenre, setActiveGenre] = useState('All')
   const [search, setSearch] = useState('')
 
-  // Playback State
+  // Playback State with LocalStorage Persistence
   const [currentTrack, setCurrentTrack] = useState(null)
   const [isPlaying, setIsPlaying] = useState(false)
   const [progress, setProgress] = useState(0)
   const [duration, setDuration] = useState(0)
-  const [volume, setVolume] = useState(0.8)
-  const [isMuted, setIsMuted] = useState(false)
-  const [shuffle, setShuffle] = useState(false)
-  const [repeatMode, setRepeatMode] = useState('off') // 'off' | 'all' | 'one'
+  const [volume, setVolume] = useState(() => {
+    const saved = localStorage.getItem('spvm3_volume')
+    return saved !== null ? Number(saved) : 0.8
+  })
+  const [isMuted, setIsMuted] = useState(() => {
+    return localStorage.getItem('spvm3_muted') === 'true'
+  })
+  const [shuffle, setShuffle] = useState(() => {
+    return localStorage.getItem('spvm3_shuffle') === 'true'
+  })
+  const [repeatMode, setRepeatMode] = useState(() => {
+    return localStorage.getItem('spvm3_repeat') || 'off' // 'off' | 'all' | 'one'
+  })
 
   // Queue & Extras
   const [queue, setQueue] = useState([])
   const [showVisualizer, setShowVisualizer] = useState(false)
   const [showQueue, setShowQueue] = useState(false)
+  const [toastMessage, setToastMessage] = useState(null)
 
   // Playlist Modal State
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -45,6 +58,30 @@ export default function App() {
   const [playlistDesc, setPlaylistDesc] = useState('')
 
   const audioRef = useRef(null)
+
+  // Save Settings to LocalStorage
+  useEffect(() => {
+    localStorage.setItem('spvm3_volume', volume)
+  }, [volume])
+
+  useEffect(() => {
+    localStorage.setItem('spvm3_muted', isMuted)
+  }, [isMuted])
+
+  useEffect(() => {
+    localStorage.setItem('spvm3_shuffle', shuffle)
+  }, [shuffle])
+
+  useEffect(() => {
+    localStorage.setItem('spvm3_repeat', repeatMode)
+  }, [repeatMode])
+
+  const triggerToast = (msg) => {
+    setToastMessage(msg)
+    setTimeout(() => {
+      setToastMessage(null)
+    }, 2800)
+  }
 
   // Initial Data Load
   useEffect(() => {
@@ -71,12 +108,12 @@ export default function App() {
           }
         })
         .catch(console.error)
-    }, 150)
+    }, 120)
 
     return () => clearTimeout(timer)
   }, [activeGenre, search, activeView, activePlaylistId])
 
-  // Track switching audio source
+  // Audio source change
   useEffect(() => {
     if (!audioRef.current || !currentTrack) return
     const audio = audioRef.current
@@ -87,7 +124,7 @@ export default function App() {
     }
     if (isPlaying) {
       audio.play().catch((err) => {
-        console.warn('Playback autoplay policy prevented play:', err)
+        console.warn('Autoplay prevented:', err)
         setIsPlaying(false)
       })
     }
@@ -99,7 +136,7 @@ export default function App() {
     audioRef.current.volume = isMuted ? 0 : volume
   }, [volume, isMuted])
 
-  // Global Keyboard Shortcuts
+  // Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (['input', 'textarea'].includes(e.target.tagName.toLowerCase())) return
@@ -161,7 +198,6 @@ export default function App() {
       return
     }
 
-    // Check custom queue first
     if (queue.length > 0) {
       const [nextQueued, ...restQueue] = queue
       setQueue(restQueue)
@@ -216,9 +252,24 @@ export default function App() {
   }
 
   function handleToggleRepeat() {
-    if (repeatMode === 'off') setRepeatMode('all')
-    else if (repeatMode === 'all') setRepeatMode('one')
-    else setRepeatMode('off')
+    if (repeatMode === 'off') {
+      setRepeatMode('all')
+      triggerToast('Repeat Mode: Repeat All 🔁')
+    } else if (repeatMode === 'all') {
+      setRepeatMode('one')
+      triggerToast('Repeat Mode: Repeat One 🔂')
+    } else {
+      setRepeatMode('off')
+      triggerToast('Repeat Mode: Off ➡️')
+    }
+  }
+
+  function handleToggleShuffle() {
+    setShuffle((s) => {
+      const next = !s
+      triggerToast(next ? 'Shuffle Enabled 🔀' : 'Shuffle Disabled ➡️')
+      return next
+    })
   }
 
   function handleToggleFavorite(trackId) {
@@ -230,12 +281,56 @@ export default function App() {
         if (currentTrack?.id === trackId) {
           setCurrentTrack((prev) => ({ ...prev, is_favorite: res.is_favorite }))
         }
+        triggerToast(res.is_favorite ? 'Added to Favorites ❤️' : 'Removed from Favorites 🤍')
       })
       .catch(console.error)
   }
 
   function handleAddToQueue(track) {
     setQueue((prev) => [...prev, track])
+    triggerToast(`Added "${track.title}" to Up Next queue ➕`)
+  }
+
+  function handleRemoveFromQueue(index) {
+    setQueue((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  function handleClearQueue() {
+    setQueue([])
+    triggerToast('Queue cleared')
+  }
+
+  function handleAddToPlaylist(playlistId, trackId) {
+    addTrackToPlaylist(playlistId, trackId)
+      .then(() => {
+        fetchPlaylists().then(setPlaylists).catch(console.error)
+        triggerToast('Track added to playlist 📂')
+      })
+      .catch((err) => triggerToast(err.message))
+  }
+
+  function handleRemoveFromPlaylist(playlistId, trackId) {
+    removeTrackFromPlaylist(playlistId, trackId)
+      .then(() => {
+        fetchPlaylists().then(setPlaylists).catch(console.error)
+        setTracks((prev) => prev.filter((t) => t.id !== trackId))
+        triggerToast('Track removed from playlist')
+      })
+      .catch((err) => triggerToast(err.message))
+  }
+
+  function handleDeletePlaylist(playlistId) {
+    if (!window.confirm('Are you sure you want to delete this playlist?')) return
+    deletePlaylist(playlistId)
+      .then(() => {
+        setPlaylists((prev) => prev.filter((p) => p.id !== playlistId))
+        if (activePlaylistId === playlistId) {
+          setActiveView('library')
+          setActivePlaylistId(null)
+        }
+        triggerToast('Playlist deleted')
+      })
+      .catch((err) => triggerToast(err.message))
   }
 
   function handleCreatePlaylistSubmit(e) {
@@ -249,6 +344,7 @@ export default function App() {
         setPlaylistDesc('')
         setActiveView('playlist')
         setActivePlaylistId(created.id)
+        triggerToast(`Created playlist "${created.name}" 💿`)
       })
       .catch(console.error)
   }
@@ -258,7 +354,7 @@ export default function App() {
 
   return (
     <div className="app-container">
-      {/* Hidden Audio Streamer with Range Seeking Support */}
+      {/* Hidden Audio Streamer */}
       <audio
         ref={audioRef}
         preload="metadata"
@@ -267,6 +363,13 @@ export default function App() {
         onEnded={handleNext}
         onError={(e) => console.error('Audio stream error:', e)}
       />
+
+      {/* Floating Toast Notification */}
+      {toastMessage && (
+        <div className="toast-notification">
+          {toastMessage}
+        </div>
+      )}
 
       {/* Left Sidebar */}
       <Sidebar
@@ -278,6 +381,7 @@ export default function App() {
         favoritesCount={favoritesCount}
         tracksCount={tracks.length}
         onOpenCreatePlaylist={() => setIsCreateModalOpen(true)}
+        onDeletePlaylist={handleDeletePlaylist}
       />
 
       {/* Center Main Stage */}
@@ -305,7 +409,7 @@ export default function App() {
                 <span className="status-dot"></span>
                 Connected to Library
               </span>
-              <span>{tracks.length} songs</span>
+              <span>{tracks.length} tracks</span>
             </div>
           </div>
 
@@ -351,9 +455,14 @@ export default function App() {
             tracks={tracks}
             currentTrack={currentTrack}
             isPlaying={isPlaying}
+            playlists={playlists}
+            activeView={activeView}
+            activePlaylistId={activePlaylistId}
             onSelect={handleSelect}
             onToggleFavorite={handleToggleFavorite}
             onAddToQueue={handleAddToQueue}
+            onAddToPlaylist={handleAddToPlaylist}
+            onRemoveFromPlaylist={handleRemoveFromPlaylist}
           />
         </section>
       </main>
@@ -367,8 +476,9 @@ export default function App() {
         isPlaying={isPlaying}
         onSelectTrack={(track) => {
           handleSelect(track)
-          setQueue((prev) => prev.filter((t) => t.id !== track.id))
         }}
+        onRemoveFromQueue={handleRemoveFromQueue}
+        onClearQueue={handleClearQueue}
       />
 
       {/* Glassmorphic Sticky Player Bar */}
@@ -393,7 +503,7 @@ export default function App() {
           setIsMuted(false)
         }}
         onToggleMute={() => setIsMuted((m) => !m)}
-        onToggleShuffle={() => setShuffle((s) => !s)}
+        onToggleShuffle={handleToggleShuffle}
         onToggleRepeat={handleToggleRepeat}
         onToggleVisualizer={() => setShowVisualizer((v) => !v)}
         onToggleQueue={() => setShowQueue((q) => !q)}
